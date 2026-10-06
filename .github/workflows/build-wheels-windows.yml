@@ -1,0 +1,53 @@
+name: build-windows-wheels-tcnn
+on: workflow_dispatch
+
+jobs:
+  build:
+    runs-on: windows-2022
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          repository: NVlabs/tiny-cuda-nn   # remove this line if the workflow lives in your fork
+          submodules: recursive
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.10'
+
+      - uses: Jimver/cuda-toolkit@v0.2.19
+        with:
+          cuda: '11.8.0'
+          method: network
+          use-github-cache: false
+          sub-packages: '["nvcc","cudart","thrust","visual_studio_integration","nvrtc","nvrtc_dev","cublas_dev","curand_dev","cusparse_dev","cusolver_dev"]'
+
+      - uses: ilammy/msvc-dev-cmd@v1
+
+      - name: Build wheel
+        shell: bash
+        env:
+          DISTUTILS_USE_SDK: "1"
+          NVCC_APPEND_FLAGS: "-allow-unsupported-compiler -D_ALLOW_COMPILER_AND_STL_VERSION_MISMATCH"
+          CL: "-D_ALLOW_COMPILER_AND_STL_VERSION_MISMATCH"
+          # RTX A2000 = Ampere = 86 (tcnn format: no dot)
+          TCNN_CUDA_ARCHITECTURES: "86"
+          MAX_JOBS: "1"
+        run: |
+          set -o pipefail
+          export PATH="$(cygpath -u "$VCToolsInstallDir")bin/HostX64/x64:$PATH"
+          nvcc --version
+          pip install torch==2.5.0 --index-url https://download.pytorch.org/whl/cu118
+          pip install wheel setuptools ninja numpy
+          pip wheel ./bindings/torch --no-build-isolation --no-deps -w dist -v 2>&1 | tee build.log || {
+            echo "================ ERRORS ================"
+            grep -n -i -E "error|FAILED:" build.log | grep -v -i "warning" | head -60
+            exit 1
+          }
+
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: tcnn-cu118-torch2.5.0-py310
+          path: |
+            dist/*.whl
+            build.log
