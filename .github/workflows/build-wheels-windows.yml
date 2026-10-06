@@ -27,9 +27,8 @@ jobs:
         shell: bash
         env:
           DISTUTILS_USE_SDK: "1"
-          NVCC_APPEND_FLAGS: "-allow-unsupported-compiler -D_ALLOW_COMPILER_AND_STL_VERSION_MISMATCH"
-          CL: "-D_ALLOW_COMPILER_AND_STL_VERSION_MISMATCH"
-          # RTX A2000 = Ampere = 86 (tcnn format: no dot)
+          NVCC_APPEND_FLAGS: "-allow-unsupported-compiler -D_ALLOW_COMPILER_AND_STL_VERSION_MISMATCH -Xcompiler /bigobj"
+          CL: "/bigobj -D_ALLOW_COMPILER_AND_STL_VERSION_MISMATCH"
           TCNN_CUDA_ARCHITECTURES: "86"
           MAX_JOBS: "1"
         run: |
