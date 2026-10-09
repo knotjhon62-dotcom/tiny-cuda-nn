@@ -1,4 +1,4 @@
-name: build-windows-wheels-tcnn
+name: build-windows-wheels-tcnn_cuda12
 on: workflow_dispatch
 
 jobs:
@@ -14,9 +14,10 @@ jobs:
         with:
           python-version: '3.10'
 
+      # CUDA 12.4.0: matches torch 2.5.0 + cu124
       - uses: Jimver/cuda-toolkit@v0.2.19
         with:
-          cuda: '11.8.0'
+          cuda: '12.4.0'
           method: network
           use-github-cache: false
           sub-packages: '["nvcc","cudart","thrust","visual_studio_integration","nvrtc","nvrtc_dev","cublas_dev","curand_dev","cusparse_dev","cusolver_dev"]'
@@ -27,6 +28,9 @@ jobs:
         shell: bash
         env:
           DISTUTILS_USE_SDK: "1"
+          # -allow-unsupported-compiler / _ALLOW_COMPILER_AND_STL_VERSION_MISMATCH: guard against the
+          # windows-2022 MSVC being newer than CUDA 12.4 officially supports
+          # -bigobj: needed for large translation units in tcnn's template-heavy kernels
           NVCC_APPEND_FLAGS: "-allow-unsupported-compiler -D_ALLOW_COMPILER_AND_STL_VERSION_MISMATCH -Xcompiler -bigobj"
           CL: "-bigobj -D_ALLOW_COMPILER_AND_STL_VERSION_MISMATCH"
           TCNN_CUDA_ARCHITECTURES: "86"
@@ -35,7 +39,7 @@ jobs:
           set -o pipefail
           export PATH="$(cygpath -u "$VCToolsInstallDir")bin/HostX64/x64:$PATH"
           nvcc --version
-          pip install torch==2.5.0 --index-url https://download.pytorch.org/whl/cu118
+          pip install torch==2.5.0 --index-url https://download.pytorch.org/whl/cu124
           pip install wheel setuptools ninja numpy
           pip wheel ./bindings/torch --no-build-isolation --no-deps -w dist -v 2>&1 | tee build.log || {
             echo "================ ERRORS ================"
@@ -46,7 +50,7 @@ jobs:
       - uses: actions/upload-artifact@v4
         if: always()
         with:
-          name: tcnn-cu118-torch2.5.0-py310
+          name: tcnn-cu124-torch2.5.0-py310
           path: |
             dist/*.whl
             build.log
